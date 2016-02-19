@@ -41,6 +41,9 @@ class Leaderboard(object):
 
 leaderboard = Leaderboard()
 
+def save_leaderboard():
+    leaderboard.save("leaderboard")
+
 def grade_submission(name, problem, submission):
     data = utils.read_data("data/" + problem)
 
@@ -59,6 +62,7 @@ def grade_submission(name, problem, submission):
         return "Weight overflow: {} > {}".format(total_weight, data["capacity"])
 
     leaderboard.update_record(name, problem, total_profit)
+    save_leaderboard()
 
     return "Total profit: %s" % total_profit
 
@@ -87,17 +91,10 @@ def leaderboard_page():
             problems=problems,
             verdict=verdict)
 
-def save_leaderboard():
-    leaderboard.save("leaderboard")
-
-def signal_handler(signal, frame):
-    save_leaderboard()
-
 atexit.register(save_leaderboard)
-signal.signal(signal.SIGINT, signal_handler)
 
 if __name__ == "__main__":
     leaderboard.load("leaderboard")
     app.debug = True
-    app.run()
+    app.run(host="0.0.0.0", port=80)
 
