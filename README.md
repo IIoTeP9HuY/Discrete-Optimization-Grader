@@ -1,4 +1,4 @@
-# Grader for Discrete Optimization course
+# Grader for Combinatorial Optimization course
 
 This repository contains code of web-based solutions grader for discrete optimization course
 
@@ -7,13 +7,13 @@ This repository contains code of web-based solutions grader for discrete optimiz
 To start webserver on port 80 with testcases in folder ./testcases:
 
 ```bash
-    python web.py --port 80 --data ./testcases
+python web.py --port 80 --data ./testcases
 ```
 
 To send submission to 3rd testcase:
 
 ```bash
-    ./submit.py your_name 3.public path_to_your_3_submission
+./submit.py your_name 3.public path_to_your_3_submission
 ```
 
 ### Requirements
