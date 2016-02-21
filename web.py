@@ -52,6 +52,7 @@ class Testset(object):
         self.path = path
         for name in os.listdir(path):
             self.tests.append(name)
+        self.tests = sorted(self.tests)
 
 testset = Testset()
 
