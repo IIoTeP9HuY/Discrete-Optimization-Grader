@@ -44,10 +44,29 @@ class Leaderboard(object):
 leaderboard = Leaderboard()
 leaderboard_path = None
 
-def grade_submission(name, problem, submission):
-    data = utils.read_data("data/" + problem)
+class Testset(object):
+    def __init__(self):
+        self.tests = []
 
-    taken = map(int, submission.split(' '))
+    def load(self, path):
+        self.path = path
+        for name in os.listdir(path):
+            self.tests.append(name)
+
+testset = Testset()
+
+def grade_submission(name, problem, submission):
+    if problem not in testset.tests:
+        return "Incorrect problem name"
+
+    data = utils.read_data(os.path.join(testset.path, problem))
+
+    try:
+        lines = submission.split('\n')
+        profit = int(lines[0])
+        taken = map(int, lines[1].split(' '))
+    except Exception as e:
+        return "Failed to parse submission: " + str(e)
 
     total_profit = 0
     total_weight = 0
@@ -61,14 +80,17 @@ def grade_submission(name, problem, submission):
     if total_weight > data["capacity"]:
         return "Weight overflow: {} > {}".format(total_weight, data["capacity"])
 
+    if total_profit != profit:
+        return "Wrong profit reported: got {}, expected {}".format(profit, total_profit)
+
     leaderboard.update_record(name, problem, total_profit)
-    leaderboard.save(leaderboard_page)
+    leaderboard.save(leaderboard_path)
 
     return "Total profit: %s" % total_profit
 
 @app.route("/")
 def main_page():
-    return "Hello World!"
+    return render_template("main.html")
 
 @app.route("/submit", methods=["GET", "POST"])
 def submit_page():
@@ -78,12 +100,14 @@ def submit_page():
         problem = request.form["problem"]
         verdict = grade_submission(name, problem, submission.read())
         return redirect(url_for("leaderboard_page", verdict=verdict))
-    return render_template("submit.html")
+
+    problems = testset.tests
+    return render_template("submit.html", problems=problems)
 
 @app.route("/leaderboard")
 def leaderboard_page():
     items = leaderboard.get_sorted_records()
-    problems = ["1", "2"]
+    problems = testset.tests
     verdict = request.args.get("verdict")
     return render_template(
             "leaderboard.html",
@@ -105,10 +129,18 @@ if __name__ == "__main__":
         default="leaderboard",
         help="Path to leaderboard file")
 
+    parser.add_argument(
+        "--data",
+        type=str,
+        default="data",
+        help="Path to test data")
+
     args = parser.parse_args()
 
     leaderboard_path = args.leaderboard
     leaderboard.load(args.leaderboard)
+    testset.load(args.data)
+
     app.debug = True
     app.run(host="0.0.0.0", port=args.port)
 
