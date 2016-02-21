@@ -1,6 +1,6 @@
 # Grader for Combinatorial Optimization course
 
-This repository contains code of web-based solutions grader for discrete optimization course
+This repository contains code of web-based solutions grader for combinatorial optimization course
 
 ### Usage
 
