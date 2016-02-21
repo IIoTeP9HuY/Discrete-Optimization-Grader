@@ -2,6 +2,8 @@ from flask import Flask
 from flask import render_template, request, redirect, url_for
 app = Flask(__name__)
 
+from argparse import ArgumentParser
+
 import utils
 import pickle
 import os
@@ -40,9 +42,7 @@ class Leaderboard(object):
             self.records = pickle.loads(open(path, "r").read())
 
 leaderboard = Leaderboard()
-
-def save_leaderboard():
-    leaderboard.save("leaderboard")
+leaderboard_path = None
 
 def grade_submission(name, problem, submission):
     data = utils.read_data("data/" + problem)
@@ -62,7 +62,7 @@ def grade_submission(name, problem, submission):
         return "Weight overflow: {} > {}".format(total_weight, data["capacity"])
 
     leaderboard.update_record(name, problem, total_profit)
-    save_leaderboard()
+    leaderboard.save(leaderboard_page)
 
     return "Total profit: %s" % total_profit
 
@@ -91,10 +91,24 @@ def leaderboard_page():
             problems=problems,
             verdict=verdict)
 
-atexit.register(save_leaderboard)
-
 if __name__ == "__main__":
-    leaderboard.load("leaderboard")
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=5000,
+        help="Port to run web server")
+
+    parser.add_argument(
+        "--leaderboard",
+        type=str,
+        default="leaderboard",
+        help="Path to leaderboard file")
+
+    args = parser.parse_args()
+
+    leaderboard_path = args.leaderboard
+    leaderboard.load(args.leaderboard)
     app.debug = True
-    app.run(host="0.0.0.0", port=80)
+    app.run(host="0.0.0.0", port=args.port)
 
