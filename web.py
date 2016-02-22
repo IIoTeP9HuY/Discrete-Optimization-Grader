@@ -106,6 +106,9 @@ def tsp_grader(name, problem, submission):
 
     counts = defaultdict(int)
     for v in route:
+        if v <= 0 or v > n:
+            return "Invalid vertex: " + str(v)
+
         counts[v] += 1
         if counts[v] > 1:
             return "Duplicate vertex found: " + str(v)
@@ -113,12 +116,15 @@ def tsp_grader(name, problem, submission):
     def dist(x1, y1, x2, y2):
         return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
+    xs = data["x"]
+    ys = data["y"]
+
     total_length = 0
     route.append(route[0])
     for i in range(n):
-        x, y = data["x"][route[i]], data["y"][route[i]]
-        nx, ny = data["x"][route[i + 1]], data["y"][route[i + 1]]
-        total_length += dist(x, y, nx, ny)
+        v = route[i] - 1
+        nv = route[i + 1] - 1
+        total_length += dist(xs[v], ys[v], xs[nv], ys[nv])
 
     if abs(length - total_length) > 1e-3:
         return "Wrong route length reported: got {}, actual {}".format(length, total_length)
