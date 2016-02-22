@@ -19,7 +19,6 @@ def main():
         "problem": args.testcase,
     }
     r = requests.post(url, data=data, files={"file": open(args.submission)})
-    print(r.text)
     if r.status_code == 200 and r.reason == "OK":
         for line in r.text.split("\n"):
             if "<h2>" in line:
