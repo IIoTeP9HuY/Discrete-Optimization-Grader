@@ -1,15 +1,18 @@
-from flask import Flask
+from flask import Flask, Blueprint
 from flask import render_template, request, redirect, url_for
-app = Flask(__name__)
+bp = Blueprint("grader", __name__, template_folder="templates")
 
 from argparse import ArgumentParser
+from collections import defaultdict
 
-import utils
+import knapsack_utils
+import tsp_utils
 import pickle
 import os
 import atexit
 import signal
 import sys
+import math
 
 class LeaderboardRecord(object):
     def __init__(self):
@@ -43,6 +46,7 @@ class Leaderboard(object):
 
 leaderboard = Leaderboard()
 leaderboard_path = None
+problem_name = None
 
 class Testset(object):
     def __init__(self):
@@ -56,11 +60,8 @@ class Testset(object):
 
 testset = Testset()
 
-def grade_submission(name, problem, submission):
-    if problem not in testset.tests:
-        return "Incorrect problem name"
-
-    data = utils.read_data(os.path.join(testset.path, problem))
+def knapsack_grader(name, problem, submission):
+    data = knapsack_utils.read_data(os.path.join(testset.path, problem))
 
     try:
         lines = submission.split('\n')
@@ -82,30 +83,78 @@ def grade_submission(name, problem, submission):
         return "Weight overflow: {} > {}".format(total_weight, data["capacity"])
 
     if total_profit != profit:
-        return "Wrong profit reported: got {}, expected {}".format(profit, total_profit)
+        return "Wrong profit reported: got {}, actual {}".format(profit, total_profit)
 
     leaderboard.update_record(name, problem, total_profit)
     leaderboard.save(leaderboard_path)
 
     return "Total profit: %s" % total_profit
 
-@app.route("/")
-def main_page():
-    return render_template("main.html")
+def tsp_grader(name, problem, submission):
+    data = tsp_utils.read_data(os.path.join(testset.path, problem))
 
-@app.route("/submit", methods=["GET", "POST"])
+    try:
+        lines = submission.split('\n')
+        length = float(lines[0])
+        route = map(int, lines[1].rstrip().split(' '))
+    except Exception as e:
+        return "Failed to parse submission: " + str(e)
+
+    n = len(data["x"])
+    if len(route) != n:
+        return "Route is too short: {} < {}".format(len(route), n)
+
+    counts = defaultdict(int)
+    for v in route:
+        counts[v] += 1
+        if counts[v] > 1:
+            return "Duplicate vertex found: " + str(v)
+
+    def dist(x1, y1, x2, y2):
+        return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+
+    total_length = 0
+    route.append(route[0])
+    for i in range(n):
+        x, y = data["x"][route[i]], data["y"][route[i]]
+        nx, ny = data["x"][route[i + 1]], data["y"][route[i + 1]]
+        total_length += dist(x, y, nx, ny)
+
+    if abs(length - total_length) > 1e-3:
+        return "Wrong route length reported: got {}, actual {}".format(length, total_length)
+
+    leaderboard.update_record(name, problem, total_length)
+    leaderboard.save(leaderboard_path)
+
+    return "Total length: %s" % total_length
+
+def grade_submission(name, problem, submission):
+    if problem not in testset.tests:
+        return "Incorrect problem name"
+
+    if problem_name == "knapsack":
+        return knapsack_grader(name, problem, submission)
+    if problem_name == "tsp":
+        return tsp_grader(name, problem, submission)
+
+@bp.route("/")
+def main_page():
+    return render_template("main.html", problem=problem_name.upper())
+
+@bp.route("/submit", methods=["GET", "POST"])
 def submit_page():
     if request.method == "POST":
         submission = request.files["file"]
         name = request.form["name"]
         problem = request.form["problem"]
         verdict = grade_submission(name, problem, submission.read())
-        return redirect(url_for("leaderboard_page", verdict=verdict))
+        print(verdict)
+        return redirect(url_for(".leaderboard_page", verdict=verdict))
 
     problems = testset.tests
     return render_template("submit.html", problems=problems)
 
-@app.route("/leaderboard")
+@bp.route("/leaderboard")
 def leaderboard_page():
     items = leaderboard.get_sorted_records()
     problems = testset.tests
@@ -136,12 +185,22 @@ if __name__ == "__main__":
         default="data",
         help="Path to test data")
 
+    parser.add_argument(
+        "--problem",
+        type=str,
+        required=True,
+        choices=["knapsack", "tsp"])
+
     args = parser.parse_args()
 
     leaderboard_path = args.leaderboard
     leaderboard.load(args.leaderboard)
     testset.load(args.data)
 
+    problem_name = args.problem
+
+    app = Flask(__name__)
+    app.register_blueprint(bp, url_prefix="/" + args.problem)
     app.debug = True
     app.run(host="0.0.0.0", port=args.port)
 
