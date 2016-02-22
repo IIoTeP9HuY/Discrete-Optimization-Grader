@@ -29,8 +29,9 @@
 <body>
     <h1>Leaderboard</h1>
 
-
-    <h2> {{ verdict }} </h2>
+    {% if verdict != None %}
+        <h2> {{ verdict }} </h2>
+    {% endif %}
 
     <table id="t01">
         <tr>
