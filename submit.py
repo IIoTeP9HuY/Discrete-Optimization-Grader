@@ -1,13 +1,14 @@
 #!/usr/bin/env python
+# Usage example: ./submit.py my_nickname knapsack 1.public ./1.solution
 
 import requests
 import HTMLParser
 from argparse import ArgumentParser
 
 def main():
-    parser = ArgumentParser()
+    parser = ArgumentParser(description="Script to submit solutions to grader")
     parser.add_argument("name", type=str)
-    parser.add_argument("problem", type=str, help="name of the problem (knapsack, tsp)")
+    parser.add_argument("problem", type=str, choices=["knapsack", "tsp"])
     parser.add_argument("testcase", type=str, help="name of testcase")
     parser.add_argument("submission", type=str, help="path to submission file")
 
