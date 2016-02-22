@@ -207,6 +207,14 @@ if __name__ == "__main__":
 
     app = Flask(__name__)
     app.register_blueprint(bp, url_prefix="/" + args.problem)
-    app.debug = True
+    # app.debug = True
+
+    if not app.debug:
+        import logging
+        from logging import FileHandler
+        file_handler = FileHandler(problem_name + ".log")
+        file_handler.setLevel(logging.DEBUG)
+        app.logger.addHandler(file_handler)
+
     app.run(host="0.0.0.0", port=args.port)
 
