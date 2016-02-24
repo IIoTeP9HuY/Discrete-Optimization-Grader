@@ -65,8 +65,8 @@ def knapsack_grader(name, problem, submission):
 
     try:
         lines = submission.split('\n')
-        profit = int(lines[0])
-        taken = map(int, lines[1].split(' '))
+        profit = int(lines[0].rstrip())
+        taken = map(int, lines[1].rstrip().split(' '))
     except Exception as e:
         return "Failed to parse submission: " + str(e)
 
@@ -95,7 +95,7 @@ def tsp_grader(name, problem, submission):
 
     try:
         lines = submission.split('\n')
-        length = float(lines[0])
+        length = float(lines[0].rstrip())
         route = map(int, lines[1].rstrip().split(' '))
     except Exception as e:
         return "Failed to parse submission: " + str(e)
