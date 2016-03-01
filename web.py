@@ -15,22 +15,35 @@ import sys
 import math
 
 class LeaderboardRecord(object):
-    def __init__(self):
+    def __init__(self, minimization=False):
         self.scores = {}
+        self.minimization = minimization
 
     def update_score(self, problem, score):
-        self.scores[problem] = max(self.scores.get(problem, 0), score)
+        if problem_name == "tsp":
+            self.minimization = True
+        else:
+            self.minimization = False
+
+        if self.minimization:
+            self.scores[problem] = min(self.scores.get(problem, float('Inf')), score)
+        else:
+            self.scores[problem] = max(self.scores.get(problem, 0), score)
 
     def get_score(self, problem):
         return self.scores.get(problem, 0)
 
 class Leaderboard(object):
-    def __init__(self):
+    def __init__(self, minimization=False):
         self.records = {}
+        self.minimization = minimization
+
+    def set_minimization(self, minimization):
+        self.minimization = minimization
 
     def update_record(self, name, problem, score):
         if not name in self.records:
-            self.records[name] = LeaderboardRecord()
+            self.records[name] = LeaderboardRecord(self.minimization)
         self.records[name].update_score(problem, score)
 
     def get_sorted_records(self):
@@ -204,6 +217,11 @@ if __name__ == "__main__":
     testset.load(args.data)
 
     problem_name = args.problem
+
+    if problem_name == "knapsack":
+        leaderboard.set_minimization(False)
+    elif problem_name == "tsp":
+        leaderboard.set_minimization(True)
 
     app = Flask(__name__)
     app.register_blueprint(bp, url_prefix="/" + args.problem)
