@@ -239,7 +239,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--frozen",
         dest="frozen",
-        default="false",
+        default=False,
         action="store_true")
 
     args = parser.parse_args()
