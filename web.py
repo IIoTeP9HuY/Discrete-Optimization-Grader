@@ -47,8 +47,10 @@ class Leaderboard(object):
         self.records[name].update_score(problem, score)
 
     def get_sorted_records(self):
-        # TODO: Sort them!
-        return self.records
+        def sorter(record):
+            return sum(record[1].scores.values()) * (1 if self.minimization else -1)
+
+        return sorted(self.records.items(), key=sorter)
 
     def save(self, path):
         open(path, "w").write(pickle.dumps(self.records))
@@ -60,6 +62,7 @@ class Leaderboard(object):
 leaderboard = Leaderboard()
 leaderboard_path = None
 problem_name = None
+is_frozen = False
 
 class Testset(object):
     def __init__(self):
@@ -69,7 +72,12 @@ class Testset(object):
         self.path = path
         for name in os.listdir(path):
             self.tests.append(name)
-        self.tests = sorted(self.tests, key=lambda s: int(s.split(".")[0]))
+
+        def sorter(name):
+            index, suite = name.split(".")
+            return (suite == "private", int(index))
+
+        self.tests = sorted(self.tests, key=sorter)
 
 testset = Testset()
 
@@ -162,6 +170,9 @@ def main_page():
 
 @bp.route("/submit", methods=["GET", "POST"])
 def submit_page():
+    if is_frozen:
+        return redirect(url_for(".leaderboard_page", verdict="Leaderboard is frozen"))
+
     if request.method == "POST":
         submission = request.files["file"]
         name = request.form["name"]
@@ -172,6 +183,21 @@ def submit_page():
 
     problems = testset.tests
     return render_template("submit.html", problems=problems)
+
+@bp.route("/submit_score")
+def submit_score_page():
+    if is_frozen:
+        return redirect(url_for(".leaderboard_page", verdict="Leaderboard is frozen"))
+
+    problem = request.args.get("problem")
+    name = request.args.get("name")
+    score = float(request.args.get("score"))
+
+    print("Submitted {}, {}, {}".format(problem, name, score))
+    leaderboard.update_record(name, problem, score)
+    leaderboard.save(leaderboard_path)
+
+    return redirect(url_for(".leaderboard_page", verdict="<OK>"))
 
 @bp.route("/leaderboard")
 def leaderboard_page():
@@ -210,11 +236,19 @@ if __name__ == "__main__":
         required=True,
         choices=["knapsack", "tsp"])
 
+    parser.add_argument(
+        "--frozen",
+        dest="frozen",
+        default="false",
+        action="store_true")
+
     args = parser.parse_args()
 
     leaderboard_path = args.leaderboard
     leaderboard.load(args.leaderboard)
     testset.load(args.data)
+
+    is_frozen = args.frozen
 
     problem_name = args.problem
 

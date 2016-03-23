@@ -4,7 +4,7 @@ This repository contains code of web-based solutions grader for combinatorial op
 
 ### Usage
 
-To start webserver for tsp problem on port 80 with testcases in folder ./tsp_testcasesrecording results to file tsp_leaderboard:
+To start webserver for tsp problem on port 80 with testcases in folder ./tsp_testcases recording results to file tsp_leaderboard:
 
 ```bash
 python web.py --port 80 --problem tsp --data ./tsp_testcases --leaderboard tsp_leaderboard

@@ -40,11 +40,11 @@
                 <td> {{ problem }} </td>
             {% endfor %}
         </tr>
-        {% for name, record in items.iteritems() %}
+        {% for name, record in items %}
             <tr>
                 <td> {{ name }} </td>
                 {% for problem in problems %}
-                    <td> {{ record.get_score(problem) }} </td>
+                    <td> {{ record.get_score(problem)|round(0, 'floor') }} </td>
                 {% endfor %}
             </tr>
         {% endfor %}
