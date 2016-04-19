@@ -12,8 +12,8 @@ import signal
 import sys
 import math
 
-import problems.knapsack.utils
-import problems.tsp.utils
+import problems.knapsack.grader as knapsack_grader
+import problems.tsp.grader as tsp_grader
 
 class LeaderboardRecord(object):
     def __init__(self, minimization=False):
@@ -65,6 +65,16 @@ leaderboard_path = None
 problem_name = None
 is_frozen = False
 
+class Problem(object):
+    def __init__(self, name, grader):
+        self.name = name
+        self.grader = grader
+
+problems = {
+    "knapsack": Problem("knapsack", knapsack_grader.grade),
+    "tsp": Problem("tsp", tsp_grader.grade)
+}
+
 class Testset(object):
     def __init__(self):
         self.tests = []
@@ -82,88 +92,14 @@ class Testset(object):
 
 testset = Testset()
 
-def knapsack_grader(name, problem, submission):
-    data = knapsack_utils.read_data(os.path.join(testset.path, problem))
+def grade_submission(name, test, submission):
+    if test not in testset.tests:
+        return "Incorrect test name"
 
-    try:
-        lines = submission.split('\n')
-        profit = int(lines[0].rstrip())
-        taken = map(int, lines[1].rstrip().split(' '))
-    except Exception as e:
-        return "Failed to parse submission: " + str(e)
+    if problem_name not in problems:
+        return "Problem is not registered"
 
-    total_profit = 0
-    total_weight = 0
-    for item in taken:
-        if item < 1 or item > len(data["weights"]):
-            return "Incorrect item %s" % item
-
-        total_weight += data["weights"][item - 1]
-        total_profit += data["profits"][item - 1]
-
-    if total_weight > data["capacity"]:
-        return "Weight overflow: {} > {}".format(total_weight, data["capacity"])
-
-    if total_profit != profit:
-        return "Wrong profit reported: got {}, actual {}".format(profit, total_profit)
-
-    leaderboard.update_record(name, problem, total_profit)
-    leaderboard.save(leaderboard_path)
-
-    return "Total profit: %s" % total_profit
-
-def tsp_grader(name, problem, submission):
-    data = tsp_utils.read_data(os.path.join(testset.path, problem))
-
-    try:
-        lines = submission.split('\n')
-        length = float(lines[0].rstrip())
-        route = map(int, lines[1].rstrip().split(' '))
-    except Exception as e:
-        return "Failed to parse submission: " + str(e)
-
-    n = len(data["x"])
-    if len(route) != n:
-        return "Route is too short: {} < {}".format(len(route), n)
-
-    counts = defaultdict(int)
-    for v in route:
-        if v <= 0 or v > n:
-            return "Invalid vertex: " + str(v)
-
-        counts[v] += 1
-        if counts[v] > 1:
-            return "Duplicate vertex found: " + str(v)
-
-    def dist(x1, y1, x2, y2):
-        return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
-
-    xs = data["x"]
-    ys = data["y"]
-
-    total_length = 0
-    route.append(route[0])
-    for i in range(n):
-        v = route[i] - 1
-        nv = route[i + 1] - 1
-        total_length += dist(xs[v], ys[v], xs[nv], ys[nv])
-
-    if abs(length - total_length) > 1e-3:
-        return "Wrong route length reported: got {}, actual {}".format(length, total_length)
-
-    leaderboard.update_record(name, problem, total_length)
-    leaderboard.save(leaderboard_path)
-
-    return "Total length: %s" % total_length
-
-def grade_submission(name, problem, submission):
-    if problem not in testset.tests:
-        return "Incorrect problem name"
-
-    if problem_name == "knapsack":
-        return knapsack_grader(name, problem, submission)
-    if problem_name == "tsp":
-        return tsp_grader(name, problem, submission)
+    problems[problem_name].grade(name, test, submission, leaderboard)
 
 @bp.route("/")
 def main_page():
@@ -270,4 +206,3 @@ if __name__ == "__main__":
         app.logger.addHandler(file_handler)
 
     app.run(host="0.0.0.0", port=args.port)
-
