@@ -5,14 +5,15 @@ bp = Blueprint("grader", __name__, template_folder="templates")
 from argparse import ArgumentParser
 from collections import defaultdict
 
-import knapsack_utils
-import tsp_utils
 import pickle
 import os
 import atexit
 import signal
 import sys
 import math
+
+import problems.knapsack.utils
+import problems.tsp.utils
 
 class LeaderboardRecord(object):
     def __init__(self, minimization=False):
