@@ -12,8 +12,8 @@ import signal
 import sys
 import math
 
-import problems.knapsack.grader as knapsack_grader
-import problems.tsp.grader as tsp_grader
+import problems.knapsack as knapsack
+import problems.tsp as tsp
 
 class LeaderboardRecord(object):
     def __init__(self, minimization=False):
@@ -66,13 +66,15 @@ problem_name = None
 is_frozen = False
 
 class Problem(object):
-    def __init__(self, name, grader):
+    def __init__(self, name, parse_testcase, parse_submission, evaluate):
         self.name = name
-        self.grader = grader
+        self.parse_testcase = parse_testcase
+        self.parse_submission = parse_submission
+        self.evaluate = evaluate
 
 problems = {
-    "knapsack": Problem("knapsack", knapsack_grader.grade),
-    "tsp": Problem("tsp", tsp_grader.grade)
+    "knapsack": Problem("knapsack", knapsack.parse_testcase, knapsack.parse_submission, knapsack.evaluate),
+    "tsp": Problem("tsp", tsp.parse_testcase, tsp.parse_submission, tsp.evaluate)
 }
 
 class Testset(object):
@@ -92,14 +94,33 @@ class Testset(object):
 
 testset = Testset()
 
-def grade_submission(name, test, submission):
-    if test not in testset.tests:
+def grade_submission(username, testcase_name, raw_submission):
+    if testcase_name not in testset.tests:
         return "Incorrect test name"
 
     if problem_name not in problems:
         return "Problem is not registered"
 
-    problems[problem_name].grade(name, test, submission, leaderboard)
+    problem = problems[problem_name]
+
+    try:
+        testcase = problem.parse_testcase(
+            open(os.path.join(testset.path, testcase_name)).readlines())
+    except Exception as e:
+        return "Failed to parse testcase: " + str(e)
+
+    try:
+        submission = problem.parse_submission(raw_submission)
+    except Exception as e:
+        return "Failed to parse submission: " + str(e)
+
+    try:
+        score = problem.evaluate(testcase, submission)
+        leaderboard.update_record(username, testcase_name, score)
+        leaderboard.save(leaderboard_path)
+    except Exception as e:
+        return "Failed to evaluate submission: " + str(e)
+
 
 @bp.route("/")
 def main_page():
@@ -112,9 +133,9 @@ def submit_page():
 
     if request.method == "POST":
         submission = request.files["file"]
-        name = request.form["name"]
-        problem = request.form["problem"]
-        verdict = grade_submission(name, problem, submission.read())
+        username = request.form["name"]
+        testcase_name = request.form["problem"]
+        verdict = grade_submission(username, testcase_name, submission.read())
         print(verdict)
         return redirect(url_for(".leaderboard_page", verdict=verdict))
 
