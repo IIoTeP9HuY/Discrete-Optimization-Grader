@@ -1,3 +1,5 @@
+import math
+
 from utils import parse_ints, parse_floats
 
 def parse_testcase(lines):
@@ -26,7 +28,12 @@ def parse_testcase(lines):
 
 def parse_submission(submission):
     lines = submission.rstrip().split('\n')
-    return [parse_floats(line) for line in lines]
+    total_cost = parse_floats(lines[0])[0]
+    assignments = [parse_floats(line) for line in lines[1:]]
+    return {
+        "total_cost": total_cost,
+        "assignments": assignments
+    }
 
 def evaluate(testcase, submission):
     warehouse_capacities = testcase["warehouse_capacities"]
@@ -38,7 +45,8 @@ def evaluate(testcase, submission):
     customer_count = len(customer_demands)
     residual_warehouse_capacities = warehouse_capacities[:]
 
-    assignments = submission
+    user_total_cost = submission["total_cost"]
+    assignments = submission["assignments"]
 
     if len(assignments) != customer_count:
         raise Exception("Wrong number of customers, expected {}, found {}".format(customer_count, len(assignments)))
@@ -68,5 +76,11 @@ def evaluate(testcase, submission):
 
         if residual_warehouse_capacities[j] < warehouse_capacities[j]:
             open_cost += warehouse_open_costs[j]
+
+    total_cost = open_cost + serve_cost
+
+    if abs(total_cost - user_total_cost) > 1e-3:
+        raise Exception("Wrong cost reported: got {}, actual {}"
+                        .format(user_total_cost, total_cost))
 
     return open_cost + serve_cost
