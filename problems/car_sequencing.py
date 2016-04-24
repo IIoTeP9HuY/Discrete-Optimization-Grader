@@ -1,5 +1,4 @@
-def parse_ints(line):
-    return map(int, line.strip().split())
+from utils import parse_ints
 
 def parse_testcase(lines):
     total_cars_number, options_number, types_number = parse_ints(lines[0])

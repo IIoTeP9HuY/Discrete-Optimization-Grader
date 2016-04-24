@@ -14,6 +14,7 @@ import math
 import problems.knapsack as knapsack
 import problems.tsp as tsp
 import problems.car_sequencing as car_sequencing
+import problems.warehouse_location as warehouse_location
 
 class ScoringType(object):
     MAXIMIZATION = "maximization"
@@ -22,17 +23,21 @@ class ScoringType(object):
 SCORING_TYPES = [ScoringType.MAXIMIZATION, ScoringType.MINIMIZATION]
 
 class LeaderboardRecord(object):
-    def __init__(self):
+    def __init__(self, scoring_type):
         self.scores = {}
+        self.scoring_type = scoring_type
 
-    def update_score(self, problem, score, scoring_type):
-        if scoring_type == ScoringType.MINIMIZATION:
+    def update_score(self, problem, score):
+        if self.scoring_type == ScoringType.MINIMIZATION:
             self.scores[problem] = min(self.scores.get(problem, float('Inf')), score)
-        elif scoring_type == ScoringType.MAXIMIZATION:
+        elif self.scoring_type == ScoringType.MAXIMIZATION:
             self.scores[problem] = max(self.scores.get(problem, 0), score)
 
     def get_score(self, problem):
-        return self.scores.get(problem, 0)
+        if self.scoring_type == ScoringType.MINIMIZATION:
+            return self.scores.get(problem, float('Inf'))
+        if self.scoring_type == ScoringType.MAXIMIZATION:
+            return self.scores.get(problem, 0)
 
 class Leaderboard(object):
     def __init__(self, leaderboard_path, scoring_type, is_frozen):
@@ -45,8 +50,8 @@ class Leaderboard(object):
 
     def update_record(self, name, problem, score):
         if not name in self.records:
-            self.records[name] = LeaderboardRecord()
-        self.records[name].update_score(problem, score, self.scoring_type)
+            self.records[name] = LeaderboardRecord(self.scoring_type)
+        self.records[name].update_score(problem, score)
 
     def get_sorted_records(self):
         def sorter(record):
@@ -60,6 +65,10 @@ class Leaderboard(object):
     def load(self):
         if os.path.exists(self.path):
             self.records = pickle.loads(open(self.path, "r").read())
+
+        # COMPAT
+        for record in self.records.values():
+            record.scoring_type = self.scoring_type
 
 class Problem(object):
     def __init__(self, name, parse_testcase, parse_submission, evaluate, scoring_type):
@@ -94,6 +103,13 @@ def populate_problems():
         car_sequencing.parse_testcase,
         car_sequencing.parse_submission,
         car_sequencing.evaluate,
+        ScoringType.MINIMIZATION))
+
+    add_problem(Problem(
+        "warehouse_location",
+        warehouse_location.parse_testcase,
+        warehouse_location.parse_submission,
+        warehouse_location.evaluate,
         ScoringType.MINIMIZATION))
 
     return problems
