@@ -3,7 +3,6 @@ from flask import render_template, request, redirect, url_for
 bp = Blueprint("grader", __name__, template_folder="templates")
 
 from argparse import ArgumentParser
-from collections import defaultdict
 
 import pickle
 import os
@@ -15,75 +14,89 @@ import math
 import problems.knapsack as knapsack
 import problems.tsp as tsp
 
+class ScoringType(object):
+    MAXIMIZATION = "maximization"
+    MINIMIZATION = "minimization"
+
+SCORING_TYPES = [ScoringType.MAXIMIZATION, ScoringType.MINIMIZATION]
+
 class LeaderboardRecord(object):
-    def __init__(self, minimization=False):
+    def __init__(self):
         self.scores = {}
-        self.minimization = minimization
 
-    def update_score(self, problem, score):
-        if problem_name == "tsp":
-            self.minimization = True
-        else:
-            self.minimization = False
-
-        if self.minimization:
+    def update_score(self, problem, score, scoring_type):
+        if scoring_type == ScoringType.MINIMIZATION:
             self.scores[problem] = min(self.scores.get(problem, float('Inf')), score)
-        else:
+        elif scoring_type == ScoringType.MAXIMIZATION:
             self.scores[problem] = max(self.scores.get(problem, 0), score)
 
     def get_score(self, problem):
         return self.scores.get(problem, 0)
 
 class Leaderboard(object):
-    def __init__(self, minimization=False):
+    def __init__(self, leaderboard_path, scoring_type, is_frozen):
         self.records = {}
-        self.minimization = minimization
-
-    def set_minimization(self, minimization):
-        self.minimization = minimization
+        self.path = leaderboard_path
+        if scoring_type not in SCORING_TYPES:
+            raise Exception("Invalid scoring type " + scoring_type)
+        self.scoring_type = scoring_type
+        self.is_frozen = is_frozen
 
     def update_record(self, name, problem, score):
         if not name in self.records:
-            self.records[name] = LeaderboardRecord(self.minimization)
-        self.records[name].update_score(problem, score)
+            self.records[name] = LeaderboardRecord()
+        self.records[name].update_score(problem, score, self.scoring_type)
 
     def get_sorted_records(self):
         def sorter(record):
-            return sum(record[1].scores.values()) * (1 if self.minimization else -1)
+            return sum(record[1].scores.values()) * (1 if self.scoring_type == ScoringType.MINIMIZATION else -1)
 
         return sorted(self.records.items(), key=sorter)
 
-    def save(self, path):
-        open(path, "w").write(pickle.dumps(self.records))
+    def save(self):
+        open(self.path, "w").write(pickle.dumps(self.records))
 
-    def load(self, path):
-        if os.path.exists(path):
-            self.records = pickle.loads(open(path, "r").read())
-
-leaderboard = Leaderboard()
-leaderboard_path = None
-problem_name = None
-is_frozen = False
+    def load(self):
+        if os.path.exists(self.path):
+            self.records = pickle.loads(open(self.path, "r").read())
 
 class Problem(object):
-    def __init__(self, name, parse_testcase, parse_submission, evaluate):
+    def __init__(self, name, parse_testcase, parse_submission, evaluate, scoring_type):
         self.name = name
         self.parse_testcase = parse_testcase
         self.parse_submission = parse_submission
         self.evaluate = evaluate
+        self.scoring_type = scoring_type
 
-problems = {
-    "knapsack": Problem("knapsack", knapsack.parse_testcase, knapsack.parse_submission, knapsack.evaluate),
-    "tsp": Problem("tsp", tsp.parse_testcase, tsp.parse_submission, tsp.evaluate)
-}
+def populate_problems():
+    problems = {}
+
+    def add_problem(problem):
+        problems[problem.name] = problem
+
+    add_problem(Problem(
+        "knapsack",
+        knapsack.parse_testcase,
+        knapsack.parse_submission,
+        knapsack.evaluate,
+        ScoringType.MAXIMIZATION))
+
+    add_problem(Problem(
+        "tsp",
+        tsp.parse_testcase,
+        tsp.parse_submission,
+        tsp.evaluate,
+        ScoringType.MINIMIZATION))
+
+    return problems
 
 class Testset(object):
-    def __init__(self):
+    def __init__(self, path):
         self.tests = []
-
-    def load(self, path):
         self.path = path
-        for name in os.listdir(path):
+
+    def load(self):
+        for name in os.listdir(self.path):
             self.tests.append(name)
 
         def sorter(name):
@@ -92,16 +105,14 @@ class Testset(object):
 
         self.tests = sorted(self.tests, key=sorter)
 
-testset = Testset()
+# Global state of the application, access in multithreaded environment should be guarded
+leaderboard = None
+problem = None
+testset = None
 
 def grade_submission(username, testcase_name, raw_submission):
     if testcase_name not in testset.tests:
         return "Incorrect test name"
-
-    if problem_name not in problems:
-        return "Problem is not registered"
-
-    problem = problems[problem_name]
 
     try:
         testcase = problem.parse_testcase(
@@ -117,18 +128,19 @@ def grade_submission(username, testcase_name, raw_submission):
     try:
         score = problem.evaluate(testcase, submission)
         leaderboard.update_record(username, testcase_name, score)
-        leaderboard.save(leaderboard_path)
+        leaderboard.save()
+        return "Submission score: " + str(score)
     except Exception as e:
         return "Failed to evaluate submission: " + str(e)
 
 
 @bp.route("/")
 def main_page():
-    return render_template("main.html", problem=problem_name.upper())
+    return render_template("main.html", problem=problem.name.upper())
 
 @bp.route("/submit", methods=["GET", "POST"])
 def submit_page():
-    if is_frozen:
+    if leaderboard.is_frozen:
         return redirect(url_for(".leaderboard_page", verdict="Leaderboard is frozen"))
 
     if request.method == "POST":
@@ -144,7 +156,7 @@ def submit_page():
 
 @bp.route("/submit_score")
 def submit_score_page():
-    if is_frozen:
+    if leaderboard.is_frozen:
         return redirect(url_for(".leaderboard_page", verdict="Leaderboard is frozen"))
 
     problem = request.args.get("problem")
@@ -153,7 +165,7 @@ def submit_score_page():
 
     print("Submitted {}, {}, {}".format(problem, name, score))
     leaderboard.update_record(name, problem, score)
-    leaderboard.save(leaderboard_path)
+    leaderboard.save()
 
     return redirect(url_for(".leaderboard_page", verdict="<OK>"))
 
@@ -202,18 +214,24 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    leaderboard_path = args.leaderboard
-    leaderboard.load(args.leaderboard)
-    testset.load(args.data)
-
-    is_frozen = args.frozen
-
+    problems = populate_problems()
     problem_name = args.problem
+    if problem_name not in problems:
+        raise Exception("Problem is not registered")
 
-    if problem_name == "knapsack":
-        leaderboard.set_minimization(False)
-    elif problem_name == "tsp":
-        leaderboard.set_minimization(True)
+    problem = problems[problem_name]
+
+    leaderboard = Leaderboard(args.leaderboard, problem.scoring_type, args.frozen)
+    try:
+        leaderboard.load()
+    except Exception as e:
+        raise Exception("Failed to load leaderboard: " + str(e))
+
+    testset = Testset(args.data)
+    try:
+        testset.load()
+    except Exception as e:
+        raise Exception("Failed to load testset: " + str(e))
 
     app = Flask(__name__)
     app.register_blueprint(bp, url_prefix="/" + args.problem)
