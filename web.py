@@ -217,7 +217,7 @@ if __name__ == "__main__":
     problems = populate_problems()
     problem_name = args.problem
     if problem_name not in problems:
-        raise Exception("Problem is not registered")
+        raise Exception('Problem "{}" is not registered'.format(problem_name))
 
     problem = problems[problem_name]
 
