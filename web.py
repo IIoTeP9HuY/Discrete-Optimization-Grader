@@ -13,6 +13,7 @@ import math
 
 import problems.knapsack as knapsack
 import problems.tsp as tsp
+import problems.car_sequencing as car_sequencing
 
 class ScoringType(object):
     MAXIMIZATION = "maximization"
@@ -88,6 +89,13 @@ def populate_problems():
         tsp.evaluate,
         ScoringType.MINIMIZATION))
 
+    add_problem(Problem(
+        "car_sequencing",
+        car_sequencing.parse_testcase,
+        car_sequencing.parse_submission,
+        car_sequencing.evaluate,
+        ScoringType.MINIMIZATION))
+
     return problems
 
 class Testset(object):
@@ -101,7 +109,7 @@ class Testset(object):
 
         def sorter(name):
             index, suite = name.split(".")
-            return (suite == "private", int(index))
+            return (suite == "private", index)
 
         self.tests = sorted(self.tests, key=sorter)
 
@@ -181,6 +189,8 @@ def leaderboard_page():
             verdict=verdict)
 
 if __name__ == "__main__":
+    problems = populate_problems()
+
     parser = ArgumentParser()
     parser.add_argument(
         "--port",
@@ -204,7 +214,7 @@ if __name__ == "__main__":
         "--problem",
         type=str,
         required=True,
-        choices=["knapsack", "tsp"])
+        choices=problems.keys())
 
     parser.add_argument(
         "--frozen",
@@ -214,11 +224,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    problems = populate_problems()
     problem_name = args.problem
     if problem_name not in problems:
         raise Exception('Problem "{}" is not registered'.format(problem_name))
-
     problem = problems[problem_name]
 
     leaderboard = Leaderboard(args.leaderboard, problem.scoring_type, args.frozen)
